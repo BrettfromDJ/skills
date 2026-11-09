@@ -4,29 +4,9 @@ Skills for designers and builders who care about the details.
 
 <!-- Drag your demo video into this spot while editing the README on GitHub. -->
 
-## Installcat > README.md <<'EOF'
-# Skills
-
-Skills for designers and builders who care about the details.
-
-<!-- Drag your demo video into this spot while editing the README on GitHub. -->
-
-## Installcat > README.md <<'EOF'
-# Skills
-
-Skills for designers and builders who care about the details.
-
-<!-- Drag your demo video into this spot while editing the README on GitHub. -->
-
 ## Install
-cat > README.md <<'EOF'
-# Skills
 
-Skills for designers and builders who care about the details.
-
-<!-- Drag your demo video into this spot while editing the README on GitHub. -->
-
-## Install
+    npx skills@latest add BrettfromDJ/skills
 
 Or copy a skill folder from `skills/` into `~/.claude/skills/` (just for you) or `.claude/skills/` in a project (for everyone working on it).
 
