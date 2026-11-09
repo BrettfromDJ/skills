@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pretty Text Wrap: before and after</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light;
+    --page: #FAFAFA;
+    --frame: #E7E7E7;
+    --panel: #F7F7F7;
+    --skel: #E4E4E3;
+    --skel-2: #D6D5D3;
+    --card: #FFFFFF;
+    --ink: #1D1D1F;
+    --body: #5E5E63;
+    --prompt: #4A4A4F;
+    --faint: #9A9AA0;
+    --blue: #2C6ED5;
+    --blue-bg: #E4EEFB;
+    --pill: #EDEDED;
+    --pill-ink: #5A5A5F;
+    --widow: #D2335C;
+    --widow-bg: rgba(226, 64, 102, .14);
+    --ctl: rgba(255, 255, 255, .8);
+    --s: 1;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #17181B; --frame: #2E3036; --panel: #1E2024; --skel: #2B2D33; --skel-2: #363940;
+      --card: #26282E; --ink: #EDEDEF; --body: #A2A3AA; --prompt: #C4C5CB; --faint: #6F7178;
+      --blue: #78AEFF; --blue-bg: rgba(120, 174, 255, .15); --pill: #26282D; --pill-ink: #A9AAB0;
+      --widow: #FF7D9E; --widow-bg: rgba(255, 125, 158, .17); --ctl: rgba(38, 40, 46, .8);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #17181B; --frame: #2E3036; --panel: #1E2024; --skel: #2B2D33; --skel-2: #363940;
+    --card: #26282E; --ink: #EDEDEF; --body: #A2A3AA; --prompt: #C4C5CB; --faint: #6F7178;
+    --blue: #78AEFF; --blue-bg: rgba(120, 174, 255, .15); --pill: #26282D; --pill-ink: #A9AAB0;
+    --widow: #FF7D9E; --widow-bg: rgba(255, 125, 158, .17); --ctl: rgba(38, 40, 46, .8);
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--page); color: var(--ink);
+    font-family: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; overflow: hidden;
+  }
+
+  /* 1080 × 1080 stage, scaled to the window */
+  .frame { position: relative; width: calc(1080px * var(--s)); height: calc(1080px * var(--s)); }
+  .stage {
+    position: absolute; top: 0; left: 0; width: 1080px; height: 1080px;
+    transform: scale(var(--s)); transform-origin: 0 0;
+    background: var(--page); overflow: hidden;
+  }
+  .scene { position: absolute; inset: 0; }
+
+  .prompt {
+    position: absolute; top: 92px; left: 0; right: 0; text-align: center;
+    font-family: "Geist Mono", ui-monospace, Menlo, monospace;
+    font-size: 21px; letter-spacing: 0.02em; color: var(--prompt); white-space: pre;
+  }
+  .prompt .gt { color: var(--faint); }
+  .prompt .cmd { color: var(--blue); }
+  .prompt .ch { opacity: 0; }
+  .prompt .ch.on { opacity: 1; }
+  .prompt .ch.cur { box-shadow: 2px 0 0 0 var(--blue); animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { box-shadow: none; } }
+
+  .device {
+    position: absolute; top: 172px; width: 444px; height: 736px;
+    border: 1.5px solid var(--frame); border-radius: 60px;
+  }
+  .device.before { left: 70px; }
+  .device.after { left: 566px; }
+  .screen {
+    position: absolute; inset: 9px; border-radius: 51px;
+    background: var(--panel); border: 1px solid var(--frame); overflow: hidden;
+  }
+  .content { position: absolute; inset: 30px 30px 30px; }
+
+  .nav { display: flex; align-items: center; justify-content: space-between; height: 34px; }
+  .logo { width: 34px; height: 34px; border-radius: 10px; background: var(--skel-2); }
+  .nav-bars { display: flex; gap: 10px; }
+  .bar { height: 10px; border-radius: 5px; background: var(--skel); }
+
+  .text { position: relative; }
+  .text .w { position: absolute; top: 0; left: 0; white-space: pre; }
+  .text .hl {
+    position: absolute; border-radius: 7px; background: var(--widow-bg);
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--widow) 45%, transparent); opacity: 0;
+  }
+  .t-h { font-size: 29px; line-height: 36px; font-weight: 600; letter-spacing: -0.022em; color: var(--ink); }
+  .t-p { font-size: 16.5px; line-height: 25px; color: var(--body); }
+  .t-ct { font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); }
+  .t-cd { font-size: 15px; line-height: 22px; color: var(--body); }
+
+  .h-wrap { margin-top: 34px; }
+  .p-wrap { margin-top: 14px; }
+  .skel-lines { margin-top: 28px; display: grid; gap: 14px; }
+  .skel-lines .bar { height: 12px; border-radius: 6px; }
+
+  .card {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    background: var(--card); border-radius: 24px; padding: 20px 22px 22px;
+    border: 1px solid var(--frame);
+  }
+  .card .cd-wrap { margin-top: 6px; }
+  .card .btn { margin-top: 16px; width: 112px; height: 32px; border-radius: 16px; background: var(--skel); }
+
+  .pill {
+    position: absolute; top: 950px; height: 44px; padding: 0 20px; border-radius: 22px;
+    display: flex; align-items: center; font-size: 21px; font-weight: 500;
+    background: var(--pill); color: var(--pill-ink);
+    transform: translateX(-50%); transition: background .45s, color .45s;
+  }
+  .pill.before { left: 292px; }
+  .pill.after { left: 788px; }
+  .pill.after.on { background: var(--blue-bg); color: var(--blue); }
+
+  .measure { position: absolute; left: -10000px; top: 0; visibility: hidden; white-space: pre; }
+
+  .controls { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; font-size: 14px; }
+  .controls button {
+    font: inherit; font-weight: 500; color: var(--ink); background: var(--ctl);
+    border: 1px solid var(--frame); border-radius: 999px; padding: 8px 15px; cursor: pointer;
+  }
+  .controls button:hover { border-color: var(--faint); }
+  .controls button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .hint { color: var(--faint); padding: 0 6px; }
+  body.clean .controls { display: none; }
+  body.clean { cursor: none; }
+</style>
+</head>
+<body>
+  <div class="frame">
+    <div class="stage" id="stage" role="img"
+      aria-label="Before and after: the same mobile screen. On the left, headings and paragraphs end with single words on their last lines. On the right, after running the pretty-text-wrap skill, the words move into evenly balanced lines.">
+      <div class="scene" id="scene">
+        <div class="prompt" id="prompt"></div>
+        <div class="device before"><div class="screen"><div class="content" data-panel="before"></div></div></div>
+        <div class="device after"><div class="screen"><div class="content" data-panel="after"></div></div></div>
+        <div class="pill before">Before</div>
+        <div class="pill after" id="afterPill">After</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="pause" type="button">Pause</button>
+    <button id="restart" type="button">Restart</button>
+    <button id="theme" type="button">Dark</button>
+    <button id="clean" type="button">Hide controls</button>
+    <span class="hint">Space pause · R restart · T theme · H or double-click to hide</span>
+  </div>
+
+<script>
+(() => {
+  const SIZE = 1080;
+  const $ = (s, r = document) => r.querySelector(s);
+  const stage = $('#stage'), scene = $('#scene'), afterPill = $('#afterPill');
+
+  const PROMPT = [['gt', '> '], ['cmd', '/pretty-text-wrap'], ['', ' fix the line breaks on this page']];
+
+  // Each block: copy, style, the widest it may be, and how far the search may narrow it.
+  // Several phrasings per block: the first one that wraps badly by default and
+  // beautifully when fixed (with these fonts, at these widths) is used.
+  const BLOCKS = [
+    { key: 'h', cls: 't-h', mode: 'balance', maxW: 382, minW: 250, lines: [2, 4], texts: [
+      'Plan your whole week without ever opening a spreadsheet again',
+      'Your whole week, planned around the meetings you can’t move',
+      'See your entire week at a glance and plan it in minutes',
+      'The calendar that plans your week before you even ask',
+      'Plan your entire week in minutes, not in a spreadsheet',
+      'Every task, every meeting and every deadline in one calm view'
+    ] },
+    { key: 'p', cls: 't-p', mode: 'pretty', maxW: 382, minW: 290, lines: [3, 5], texts: [
+      'Drag tasks onto your calendar, set how long each one should take, and we’ll fit them around your meetings for you.',
+      'Drag any task onto your calendar, tell us how long it takes, and we’ll find the time for it between your meetings.',
+      'Add a task, say how long it should take, and we’ll find a slot for it between your meetings this week.',
+      'Drag tasks onto your calendar and set how long each one should take. We’ll fit everything around your meetings, so you can get on with it.',
+      'Tell us what needs doing and roughly how long it takes. We’ll fit each task around your meetings and move it if plans change.'
+    ] },
+    { key: 'ct', cls: 't-ct', mode: 'balance', maxW: 336, minW: 190, lines: [2, 2], texts: [
+      'Your free trial ends in three days, on Friday',
+      'Your free trial ends this Friday at noon',
+      'Only three days left in your free trial',
+      'Your trial ends on Friday at midnight',
+      'Heads up: your free trial ends in three days'
+    ] },
+    { key: 'cd', cls: 't-cd', mode: 'pretty', maxW: 336, minW: 230, lines: [2, 4], texts: [
+      'Add a payment method to keep your projects, files and team members exactly where they are.',
+      'Add a payment method to keep your projects, files and team exactly where they are.',
+      'Add a card before Friday to keep your projects, files and teammates right where you left them.',
+      'Add a card before then to keep every project, file and teammate right where you left them.'
+    ] }
+  ];
+
+  // ---------- prompt ----------
+  const promptEl = $('#prompt');
+  const chars = [];
+  for (const [cls, str] of PROMPT) {
+    const seg = document.createElement('span');
+    if (cls) seg.className = cls;
+    for (const c of str) {
+      const s = document.createElement('span');
+      s.className = 'ch';
+      s.textContent = c;
+      seg.appendChild(s);
+      chars.push(s);
+    }
+    promptEl.appendChild(seg);
+  }
+
+  // ---------- panel skeleton ----------
+  function buildPanel(root) {
+    root.innerHTML = `
+      <div class="nav"><div class="logo"></div><div class="nav-bars"><div class="bar" style="width:46px"></div><div class="bar" style="width:46px"></div><div class="bar" style="width:30px"></div></div></div>
+      <div class="h-wrap"><div class="text t-h" data-key="h"></div></div>
+      <div class="p-wrap"><div class="text t-p" data-key="p"></div></div>
+      <div class="skel-lines"><div class="bar" style="width:74%"></div><div class="bar" style="width:88%"></div><div class="bar" style="width:52%"></div></div>
+      <div class="card">
+        <div class="text t-ct" data-key="ct"></div>
+        <div class="cd-wrap"><div class="text t-cd" data-key="cd"></div></div>
+        <div class="btn"></div>
+      </div>`;
+  }
+  const panels = { before: $('[data-panel="before"]'), after: $('[data-panel="after"]') };
+  buildPanel(panels.before);
+  buildPanel(panels.after);
+
+  // ---------- measurement (outside the scaled stage, so widths are true CSS px) ----------
+  function measure(block, text) {
+    const box = document.createElement('div');
+    box.className = 'measure ' + block.cls;
+    document.body.appendChild(box);
+    const words = text.split(' ');
+    const spans = words.map((w) => { const s = document.createElement('span'); s.textContent = w; box.appendChild(s); return s; });
+    const sp = document.createElement('span'); sp.textContent = ' '; box.appendChild(sp);
+    const widths = spans.map((s) => s.getBoundingClientRect().width);
+    const space = sp.getBoundingClientRect().width;
+    const lh = parseFloat(getComputedStyle(box).lineHeight);
+    box.remove();
+    return { words, widths, space, lh };
+  }
+
+  // ---------- line breaking ----------
+  const lineLen = (m, a, b) => { let s = 0; for (let i = a; i < b; i++) s += m.widths[i]; return s + m.space * (b - a - 1); };
+
+  // Browser default: fill each line, then move on.
+  function greedy(m, W) {
+    const breaks = [0];
+    let len = 0;
+    m.widths.forEach((w, i) => {
+      const add = (i === breaks[breaks.length - 1] ? 0 : m.space) + w;
+      if (len + add > W && i > breaks[breaks.length - 1]) { breaks.push(i); len = w; }
+      else len += add;
+    });
+    breaks.push(m.widths.length);
+    return breaks;
+  }
+
+  // Balance: narrowest width that keeps the same number of lines.
+  function balance(m, W) {
+    const n = greedy(m, W).length;
+    let lo = Math.max(...m.widths), hi = W;
+    for (let k = 0; k < 30; k++) {
+      const mid = (lo + hi) / 2;
+      if (greedy(m, mid).length === n) hi = mid; else lo = mid;
+    }
+    return greedy(m, hi);
+  }
+
+  // Pretty: same number of lines, minimize raggedness, and keep the last line substantial.
+  function pretty(m, W) {
+    const n = m.widths.length;
+    const L = greedy(m, W).length - 1;
+    const INF = 1e18;
+    const cost = Array.from({ length: L + 1 }, () => new Array(n + 1).fill(INF));
+    const from = Array.from({ length: L + 1 }, () => new Array(n + 1).fill(-1));
+    cost[0][0] = 0;
+    for (let k = 1; k <= L; k++) {
+      for (let i = 1; i <= n; i++) {
+        for (let j = 0; j < i; j++) {
+          if (cost[k - 1][j] === INF) continue;
+          const len = lineLen(m, j, i);
+          if (len > W) continue;
+          let c;
+          if (i === n) {
+            const target = 0.62 * W;
+            c = len < target ? (target - len) ** 2 * 4 : 0;
+            if (i - j < 2) c += 1e9;
+          } else c = (W - len) ** 2;
+          if (cost[k - 1][j] + c < cost[k][i]) { cost[k][i] = cost[k - 1][j] + c; from[k][i] = j; }
+        }
+      }
+    }
+    if (cost[L][n] === INF) return greedy(m, W);
+    const breaks = [n];
+    for (let k = L, i = n; k > 0; k--) { i = from[k][i]; breaks.unshift(i); }
+    return breaks;
+  }
+
+  function linesOf(m, breaks) {
+    const out = [];
+    for (let k = 0; k < breaks.length - 1; k++) out.push({ a: breaks[k], b: breaks[k + 1], len: lineLen(m, breaks[k], breaks[k + 1]) });
+    return out;
+  }
+
+  // Find a width where the default leaves a lone word and the fix looks genuinely good.
+  function tune(block, measureFn = measure) {
+    const fixFn = block.mode === 'balance' ? balance : pretty;
+    const variants = block.texts.map((t) => measureFn(block, t));
+    const judge = (m, strict) => {
+      for (let W = block.maxW; W >= block.minW; W--) {
+        const g = linesOf(m, greedy(m, W));
+        if (g.length < block.lines[0] || g.length > block.lines[1]) continue;
+        const gl = g[g.length - 1];
+        const gMax = Math.max(...g.map((l) => l.len));
+        if (gl.b - gl.a !== 1 || gl.len / gMax > (strict ? 0.3 : 0.45)) continue;
+        const f = linesOf(m, fixFn(m, W));
+        if (f.length !== g.length) continue;
+        const fl = f[f.length - 1];
+        const fMax = Math.max(...f.map((l) => l.len)), fMin = Math.min(...f.map((l) => l.len));
+        if (fl.b - fl.a < 2) continue;
+        const good = block.mode === 'balance'
+          ? fMin / fMax >= (strict ? 0.8 : 0.7)
+          : fl.len / fMax >= (strict ? 0.6 : 0.48) && fMin / fMax >= (strict ? 0.6 : 0.48);
+        if (good) return W;
+      }
+      return null;
+    };
+    for (const strict of [true, false]) {
+      for (const m of variants) {
+        const W = judge(m, strict);
+        if (W !== null) return { m, W, ok: true, before: greedy(m, W), after: fixFn(m, W) };
+      }
+    }
+    const m = variants[0];
+    return { m, W: block.maxW, ok: false, before: greedy(m, block.maxW), after: fixFn(m, block.maxW) };
+  }
+
+  function positions(m, breaks) {
+    const pos = [];
+    linesOf(m, breaks).forEach((line, li) => {
+      let x = 0;
+      for (let i = line.a; i < line.b; i++) { pos[i] = { x, y: li * m.lh, line: li }; x += m.widths[i] + m.space; }
+    });
+    return pos;
+  }
+
+  // ---------- render ----------
+  const layout = {};
+  function render() {
+    for (const block of BLOCKS) {
+      const t = tune(block);
+      const before = positions(t.m, t.before), after = positions(t.m, t.after);
+      const nLines = t.before.length - 1;
+      const lastIdx = t.m.words.length - 1;
+      layout[block.key] = { ...t, beforePos: before, afterPos: after, panels: {} };
+      for (const name of ['before', 'after']) {
+        const el = panels[name].querySelector(`[data-key="${block.key}"]`);
+        el.textContent = '';
+        el.style.width = t.W + 'px';
+        el.style.height = nLines * t.m.lh + 'px';
+        const p = before[lastIdx];
+        const fs = parseFloat(getComputedStyle(el).fontSize);
+        const hl = document.createElement('div');
+        hl.className = 'hl';
+        const hh = fs * 1.35;
+        Object.assign(hl.style, {
+          left: p.x - 6 + 'px', top: p.y + (t.m.lh - hh) / 2 + 'px',
+          width: t.m.widths[lastIdx] + 12 + 'px', height: hh + 'px'
+        });
+        el.appendChild(hl);
+        const spans = t.m.words.map((w, i) => {
+          const s = document.createElement('span');
+          s.className = 'w';
+          s.textContent = w;
+          s.style.left = before[i].x + 'px';
+          s.style.top = before[i].y + 'px';
+          el.appendChild(s);
+          return s;
+        });
+        layout[block.key].panels[name] = { el, hl, spans };
+      }
+    }
+  }
+
+  // ---------- scale ----------
+  let scale = 1;
+  function fit() {
+    const ctrl = document.body.classList.contains('clean') ? 0 : 70;
+    scale = Math.max(0.2, Math.min((innerWidth - 32) / SIZE, (innerHeight - 32 - ctrl) / SIZE));
+    document.documentElement.style.setProperty('--s', scale);
+  }
+  addEventListener('resize', fit);
+  fit();
+
+  // ---------- timing ----------
+  let paused = false, gen = 0;
+  class Aborted extends Error {}
+  function wait(ms) {
+    const g = gen;
+    return new Promise((res, rej) => {
+      let left = ms, last = performance.now();
+      const tick = (now) => {
+        if (g !== gen) return rej(new Aborted());
+        if (!paused) left -= now - last;
+        last = now;
+        left <= 0 ? res() : requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+  }
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  function showWidows(panel, delayStep) {
+    BLOCKS.forEach((b, i) => {
+      layout[b.key].panels[panel].hl.animate(
+        [{ opacity: 0, transform: 'scale(.85)' }, { opacity: 1, transform: 'scale(1)' }],
+        { duration: 320, delay: i * delayStep, easing: 'cubic-bezier(.3,1.4,.5,1)', fill: 'forwards' });
+    });
+  }
+
+  async function fix() {
+    const blue = cssVar('--blue');
+    const anims = [];
+    BLOCKS.forEach((b, bi) => {
+      const L = layout[b.key], P = L.panels.after;
+      P.hl.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, delay: bi * 90, fill: 'forwards' });
+      P.spans.forEach((s, i) => {
+        const from = L.beforePos[i], to = L.afterPos[i];
+        const dx = to.x - from.x, dy = to.y - from.y;
+        if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+        const color = getComputedStyle(s).color;
+        const moved = from.line !== to.line;
+        anims.push(s.animate([
+          { transform: 'translate(0,0)', color },
+          { color: moved ? blue : color, offset: 0.45 },
+          { transform: `translate(${dx}px, ${dy}px)`, color }
+        ], {
+          duration: reduce.matches ? 1 : 780,
+          delay: reduce.matches ? 0 : bi * 90 + to.line * 35,
+          easing: 'cubic-bezier(.65,0,.3,1)', fill: 'forwards'
+        }));
+      });
+    });
+    afterPill.classList.add('on');
+    await Promise.all(anims.map((a) => a.finished));
+  }
+
+  async function cycle() {
+    // reset
+    document.getAnimations().forEach((a) => { if (!a.animationName) a.cancel(); });
+    chars.forEach((c) => c.classList.remove('on', 'cur'));
+    afterPill.classList.remove('on');
+    scene.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, fill: 'forwards' });
+    await wait(500);
+
+    // type the prompt
+    for (let i = 0; i < chars.length; i++) {
+      if (i) chars[i - 1].classList.remove('cur');
+      chars[i].classList.add('on', 'cur');
+      await wait(i < 2 ? 70 : 34);
+    }
+    await wait(450);
+    chars[chars.length - 1].classList.remove('cur');
+
+    // both screens start identical: mark the widows
+    showWidows('before', 110);
+    showWidows('after', 110);
+    await wait(1100);
+
+    // run the fix on the right
+    await fix();
+    await wait(3600);
+
+    scene.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, fill: 'forwards' });
+    await wait(450);
+  }
+
+  async function loop() {
+    const g = gen;
+    try { while (g === gen) await cycle(); }
+    catch (e) { if (!(e instanceof Aborted) && e.name !== 'AbortError') console.error(e); }
+  }
+
+  // ---------- controls ----------
+  const pauseBtn = $('#pause'), themeBtn = $('#theme');
+  function togglePause() {
+    paused = !paused;
+    document.getAnimations().forEach((a) => (paused ? a.pause() : a.play()));
+    pauseBtn.textContent = paused ? 'Play' : 'Pause';
+  }
+  function restart() {
+    gen++;
+    document.getAnimations().forEach((a) => { if (!a.animationName) a.cancel(); });
+    if (paused) { paused = false; pauseBtn.textContent = 'Pause'; }
+    loop();
+  }
+  const isDark = () => {
+    const t = document.documentElement.dataset.theme;
+    return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  };
+  const syncTheme = () => { themeBtn.textContent = isDark() ? 'Light' : 'Dark'; };
+  function toggleTheme() { document.documentElement.dataset.theme = isDark() ? 'light' : 'dark'; syncTheme(); }
+  function toggleClean() { document.body.classList.toggle('clean'); fit(); }
+
+  pauseBtn.addEventListener('click', togglePause);
+  $('#restart').addEventListener('click', restart);
+  themeBtn.addEventListener('click', toggleTheme);
+  $('#clean').addEventListener('click', toggleClean);
+  document.addEventListener('dblclick', toggleClean);
+  document.addEventListener('keydown', (e) => {
+    if (e.target.closest && e.target.closest('button') && (e.key === ' ' || e.key === 'Enter')) return;
+    const k = e.key.toLowerCase();
+    if (k === ' ') { e.preventDefault(); togglePause(); }
+    else if (k === 'r') restart();
+    else if (k === 't') toggleTheme();
+    else if (k === 'h') toggleClean();
+  });
+  syncTheme();
+
+  // ---------- start ----------
+  (async () => {
+    try {
+      await Promise.all([
+        document.fonts.load('600 29px "Geist"'),
+        document.fonts.load('400 16px "Geist"'),
+        document.fonts.load('400 21px "Geist Mono"')
+      ]);
+      await document.fonts.ready;
+    } catch (_) {}
+    render();
+    loop();
+  })();
+})();
+</script>
+</body>
+</html>
